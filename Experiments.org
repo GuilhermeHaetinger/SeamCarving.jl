@@ -1,0 +1,133 @@
+#+PROPERTY: header-args:jupyter-julia :session SeamCarving :results replace :async yes :kernel julia-1.5
+#+TITLE: Seam Carving Experiments
+
+* Setup
+
+#+BEGIN_SRC bash :results none
+export JULIA_NUM_THREADS=4
+#+END_SRC
+#+RESULTS:
+
+#+BEGIN_SRC jupyter-julia
+versioninfo()
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+Julia Version 1.5.0-rc1.0
+Commit 24f033c951 (2020-06-26 20:13 UTC)
+Platform Info:
+  OS: Linux (x86_64-pc-linux-gnu)
+  CPU: Intel(R) Core(TM) i7-3520M CPU @ 2.90GHz
+  WORD_SIZE: 64
+  LIBM: libopenlibm
+  LLVM: libLLVM-9.0.1 (ORCJIT, ivybridge)
+Environment:
+  JULIA_DEPOT_PATH = ~/.Util/.julia
+  JULIA_NUM_THREADS = 4
+#+end_example
+
+#+BEGIN_SRC jupyter-julia
+using Images
+using TestImages
+using ImageFiltering
+using Plots
+using ColorSchemes
+
+using Revise
+pushfirst!(LOAD_PATH, pwd())
+
+using SeamCarving
+#+END_SRC
+
+#+RESULTS:
+: ┌ Info: Precompiling SeamCarving [top-level]
+: └ @ Base loading.jl:1278
+: WARNING: Method definition getRow(Array{T, 2}, Int64) where {T} in module SeamCarving at /home/dewey/Build/SeamCarving.jl/SeamCarving.jl:17 overwritten at /home/dewey/Build/SeamCarving.jl/SeamCarving.jl:97.
+:   ** incremental compilation may be fatally broken for this module **
+:
+: WARNING: Method definition getColumn(Array{T, 2}, Int64) where {T} in module SeamCarving at /home/dewey/Build/SeamCarving.jl/SeamCarving.jl:18 overwritten at /home/dewey/Build/SeamCarving.jl/SeamCarving.jl:101.
+:   ** incremental compilation may be fatally broken for this module **
+:
+* Energy functions
+
+#+BEGIN_SRC jupyter-julia
+mandrill = testimage("mandrill")
+seamcarver = SeamCarver(mandrill, :SobelX)
+display(getEnergyImage(seamcarver))
+seamcarver = SeamCarver(mandrill, :SobelY)
+display(getEnergyImage(seamcarver))
+seamcarver = SeamCarver(mandrill, :Sobel)
+display(getEnergyImage(seamcarver))
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+[[file:./.ob-jupyter/91ab0a12daac8d2e57523b3ba91b83bd6730cc76.png]]
+[[file:./.ob-jupyter/c2b0c090e1d5c8fa089ca2730456b7eb4b56df9c.png]]
+[[file:./.ob-jupyter/3776d514eca85b2fd4d28cc2a114223beb65b5ec.png]]
+:END:
+* Seam Energy Map calculation
+
+#+BEGIN_SRC jupyter-julia
+@time seamcarver = SeamCarver(testimage("mandrill"), :Sobel)
+get(ColorSchemes.neon, hcat(seamcarver.energyMapDict[:horizontal],
+                            seamcarver.energyMapDict[:vertical]))
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+:   4.504402 seconds (17.80 M allocations: 901.322 MiB, 4.92% gc time)
+[[file:./.ob-jupyter/8f4634525edc09b387e8c03ef608ca5a648376ac.png]]
+:END:
+
+* Carving
+
+#+BEGIN_SRC jupyter-julia
+@time seamcarver = SeamCarver(RGB.(testimage("livingroom")), :Sobel)
+display(seamcarver)
+
+display(get(ColorSchemes.leonardo, Float64.(getEnergyImage(seamcarver))))
+display(get(ColorSchemes.neon, hcat(seamcarver.energyMapDict[:horizontal],
+                                    seamcarver.energyMapDict[:vertical])))
+
+originalSize = size(seamcarver.image)
+anim = @animate for i ∈ 1:10:100
+    seamcarv = deepcopy(seamcarver)
+    carve_horizontal(seamcarv; numCarves=1)
+    toFit = deepcopy(seamcarv.image)
+    newCanvas = zeros(RGB{N0f8}, originalSize)
+    newSize = size(toFit)
+    newCanvas[1:newSize[1], 1:newSize[2]] = toFit
+    plot(newCanvas)
+end
+gif(anim, "anim_fps15.gif", fps = 60)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+[[file:./.ob-jupyter/8b7f13884ff57eaee305e16d8b1a1c1fc0c4fa59.png]]
+[[file:./.ob-jupyter/1b682a0582ef1304aa1ef307d0388495a2dd0162.png]]
+[[file:./.ob-jupyter/677f62418eb0b358e93476456067436bca7692f3.png]]
+:   2.640951 seconds (17.81 M allocations: 902.770 MiB, 6.92% gc time)
+: Animation("/tmp/jl_nnp1tI", ["000001.png", "000002.png", "000003.png", "000004.png", "000005.png", "000006.png", "000007.png", "000008.png", "000009.png", "000010.png"])
+:END:
+* Setup :noexport:
+
+#+NAME: startup
+#+BEGIN_SRC elisp :results none :eval no-export
+(defun set-tex-method ()
+  (set-input-method 'TeX)
+  (define-key evil-insert-state-local-map (kbd "_ _")
+    (lambda () (interactive) (insert "_")))
+  (define-key evil-insert-state-local-map (kbd "^ ^")
+    (lambda () (interactive) (insert "^"))))
+
+(set-tex-method)
+(setq org-image-actual-width 200)
+(load "/home/dewey/Build/JuliaCon2020/gif_in_org.el")
+#+END_SRC
+
+# Local Variables:
+# eval: (progn (org-babel-goto-named-src-block "startup") (org-babel-execute-src-block))
+# End:
